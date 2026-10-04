@@ -26,7 +26,7 @@ func TestMemoryBasics(t *testing.T) {
 	if _, err := s.GetTicket(ctx, "missing"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
-	if err := s.MarkUsed(ctx, "a"); err != nil {
+	if _, err := s.MarkUsedIfUnused(ctx, "a"); err != nil {
 		t.Fatal(err)
 	}
 	got, _ = s.GetTicket(ctx, "a")

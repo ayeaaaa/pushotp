@@ -219,3 +219,23 @@ func TestInvalidLength(t *testing.T) {
 		t.Fatalf("status = %d body = %s", rec.Code, rec.Body)
 	}
 }
+
+func TestNegativeTTL(t *testing.T) {
+	name := registerFake(t, nil)
+	h := newHandler(t, baseConfig(name), "")
+	rec := doJSON(t, h, http.MethodPost, "/api/v1/send", map[string]any{"receiver": "admin", "ttl": "-5m"}, nil)
+	if rec.Code != http.StatusBadRequest || decodeErrorCode(t, rec) != "invalid_request" {
+		t.Fatalf("status = %d body = %s", rec.Code, rec.Body)
+	}
+}
+
+func TestTrailingGarbage(t *testing.T) {
+	name := registerFake(t, nil)
+	h := newHandler(t, baseConfig(name), "")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/send", strings.NewReader(`{"receiver":"admin"} trailing`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest || decodeErrorCode(t, rec) != "invalid_request" {
+		t.Fatalf("status = %d body = %s", rec.Code, rec.Body)
+	}
+}

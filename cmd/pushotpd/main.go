@@ -10,8 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"gopkg.in/yaml.v3"
-
 	"pushotp"
 	"pushotp/httpapi"
 )
@@ -27,8 +25,8 @@ func main() {
 		logger.Error("read config", "err", err)
 		os.Exit(1)
 	}
-	var fc fileConfig
-	if err := yaml.Unmarshal(raw, &fc); err != nil {
+	fc, err := decodeConfig(raw)
+	if err != nil {
 		logger.Error("parse config", "err", err)
 		os.Exit(1)
 	}
@@ -50,6 +48,9 @@ func main() {
 		Addr:              cfg.Server.Addr,
 		Handler:           httpapi.New(v, cfg.Server.APIKey, logger),
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 	go func() {
 		logger.Info("pushotpd listening", "addr", cfg.Server.Addr)

@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"pushotp/channel"
 )
@@ -57,5 +59,18 @@ func TestSendAPIError(t *testing.T) {
 	}, channel.Message{Content: "x"})
 	if err == nil {
 		t.Fatal("expected api error")
+	}
+}
+
+func TestSendErrorDoesNotLeakToken(t *testing.T) {
+	c := &Channel{BaseURL: "http://127.0.0.1:1", Client: &http.Client{Timeout: time.Second}}
+	err := c.Send(context.Background(), channel.Target{
+		Config: map[string]string{"bot_token": "123456:SUPER_SECRET", "chat_id": "1"},
+	}, channel.Message{Content: "x"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if strings.Contains(err.Error(), "SUPER_SECRET") {
+		t.Fatalf("token leaked in error: %v", err)
 	}
 }

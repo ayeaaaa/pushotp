@@ -77,28 +77,31 @@ func (s *Store) DeleteTicket(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *Store) IncrAttempt(ctx context.Context, id string) (int, error) {
+func (s *Store) IncrAttemptIfBelow(ctx context.Context, id string, max int) (int, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	t, ok := s.tickets[id]
 	if !ok {
-		return 0, store.ErrNotFound
+		return 0, false, store.ErrNotFound
+	}
+	if t.Attempts >= max {
+		return t.Attempts, false, nil
 	}
 	t.Attempts++
 	s.tickets[id] = t
-	return t.Attempts, nil
+	return t.Attempts, true, nil
 }
 
-func (s *Store) MarkUsed(ctx context.Context, id string) error {
+func (s *Store) MarkUsedIfUnused(ctx context.Context, id string) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	t, ok := s.tickets[id]
-	if !ok {
-		return store.ErrNotFound
+	if !ok || t.Used {
+		return false, nil
 	}
 	t.Used = true
 	s.tickets[id] = t
-	return nil
+	return true, nil
 }
 
 func (s *Store) CountRecent(ctx context.Context, receiver string, window time.Duration) (int, error) {

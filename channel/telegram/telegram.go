@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"pushotp/channel"
@@ -38,6 +40,14 @@ type sendResponse struct {
 	Description string `json:"description"`
 }
 
+func sanitizeURLError(err error) error {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		return ue.Err
+	}
+	return err
+}
+
 func (c *Channel) Send(ctx context.Context, target channel.Target, msg channel.Message) error {
 	token := target.Config["bot_token"]
 	chatID := target.Config["chat_id"]
@@ -55,12 +65,12 @@ func (c *Channel) Send(ctx context.Context, target channel.Target, msg channel.M
 	url := c.BaseURL + "/bot" + token + "/sendMessage"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
-		return fmt.Errorf("telegram: build request: %w", err)
+		return fmt.Errorf("telegram: build request: %w", sanitizeURLError(err))
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		return fmt.Errorf("telegram: http: %w", err)
+		return fmt.Errorf("telegram: http: %w", sanitizeURLError(err))
 	}
 	defer resp.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 4096))

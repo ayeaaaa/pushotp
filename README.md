@@ -91,6 +91,7 @@ go run . -config config.yaml
 | `receivers[].telegram.bot_token` | Telegram Bot Token | telegram 必填 |
 | `receivers[].telegram.chat_id` | Telegram 会话 ID | telegram 必填 |
 | `receivers[].template` | 消息模板，留空用默认文案 | 空 |
+| `receivers[].config` | 自定义（第三方）渠道的凭据键值，透传给已注册渠道 | 空 |
 
 模板内置变量：`{code}`、`{ttl}`、`{scene}`、`{receiver}`；自定义变量（如 `{app}`）通过接口/HTTP 请求的 `data` 字段传入。
 

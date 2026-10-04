@@ -61,6 +61,7 @@ func TestValidateErrors(t *testing.T) {
 			c.Issuer.Secret = "s"
 			c.Issuer.TTL = -time.Minute
 		}},
+		{"issuer ttl below one second", func(c *Config) { c.Issuer.Enabled = true; c.Issuer.Secret = "s"; c.Issuer.TTL = 500 * time.Millisecond }},
 		{"bad length", func(c *Config) { c.Code.Length = 3 }},
 		{"bad storage", func(c *Config) { c.Storage.Type = "redis" }},
 		{"sqlite without path", func(c *Config) { c.Storage.Type = "sqlite" }},

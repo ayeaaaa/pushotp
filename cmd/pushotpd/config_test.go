@@ -73,6 +73,15 @@ func TestFileConfigToConfig(t *testing.T) {
 	}
 }
 
+func TestDecodeConfigRejectsUnknownFields(t *testing.T) {
+	if _, err := decodeConfig([]byte("server:\n  api_kye: x\n")); err == nil {
+		t.Fatal("expected unknown field error")
+	}
+	if _, err := decodeConfig([]byte(sampleYAML)); err != nil {
+		t.Fatalf("valid config rejected: %v", err)
+	}
+}
+
 func TestFileConfigInvalidDuration(t *testing.T) {
 	var fc fileConfig
 	if err := yaml.Unmarshal([]byte("code:\n  ttl: nope\n"), &fc); err != nil {

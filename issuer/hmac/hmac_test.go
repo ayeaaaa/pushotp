@@ -49,6 +49,17 @@ func TestVerifyExpired(t *testing.T) {
 	}
 }
 
+func TestIssueSubSecondTTLNotInstantlyExpired(t *testing.T) {
+	iss := New("secret", 500*time.Millisecond)
+	token, err := iss.Issue(context.Background(), issuer.Claims{Receiver: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := iss.Verify(context.Background(), token); err != nil {
+		t.Fatalf("sub-second TTL token should be valid: %v", err)
+	}
+}
+
 func TestVerifyMalformed(t *testing.T) {
 	iss := New("secret", time.Hour)
 	for _, token := range []string{"", "abc", "a.b.c", ".", "!!.??"} {

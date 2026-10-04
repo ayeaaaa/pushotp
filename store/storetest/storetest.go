@@ -3,6 +3,8 @@ package storetest
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -60,38 +62,95 @@ func Run(t *testing.T, newStore func(t *testing.T) store.Store) {
 		}
 	})
 
-	t.Run("IncrAttempt", func(t *testing.T) {
+	t.Run("IncrAttemptIfBelow", func(t *testing.T) {
 		s := newStore(t)
 		now := time.Now()
 		if err := s.SaveTicket(ctx, store.Ticket{ID: "t2", Receiver: "admin", CodeHash: []byte{1}, Salt: []byte{1}, CreatedAt: now, ExpiresAt: now.Add(time.Minute)}); err != nil {
 			t.Fatal(err)
 		}
 		for want := 1; want <= 3; want++ {
-			got, err := s.IncrAttempt(ctx, "t2")
-			if err != nil || got != want {
-				t.Fatalf("IncrAttempt = %d, %v; want %d", got, err, want)
+			got, allowed, err := s.IncrAttemptIfBelow(ctx, "t2", 3)
+			if err != nil || !allowed || got != want {
+				t.Fatalf("IncrAttemptIfBelow = %d, %v, %v; want %d, true, nil", got, allowed, err, want)
 			}
 		}
-		if _, err := s.IncrAttempt(ctx, "missing"); !errors.Is(err, store.ErrNotFound) {
+		got, allowed, err := s.IncrAttemptIfBelow(ctx, "t2", 3)
+		if err != nil || allowed || got != 3 {
+			t.Fatalf("IncrAttemptIfBelow at max = %d, %v, %v; want 3, false, nil", got, allowed, err)
+		}
+		if _, _, err := s.IncrAttemptIfBelow(ctx, "missing", 3); !errors.Is(err, store.ErrNotFound) {
 			t.Fatalf("err = %v, want ErrNotFound", err)
 		}
 	})
 
-	t.Run("MarkUsed", func(t *testing.T) {
+	t.Run("MarkUsedIfUnused", func(t *testing.T) {
 		s := newStore(t)
 		now := time.Now()
 		if err := s.SaveTicket(ctx, store.Ticket{ID: "t3", Receiver: "admin", CodeHash: []byte{1}, Salt: []byte{1}, CreatedAt: now, ExpiresAt: now.Add(time.Minute)}); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.MarkUsed(ctx, "t3"); err != nil {
-			t.Fatal(err)
+		ok, err := s.MarkUsedIfUnused(ctx, "t3")
+		if err != nil || !ok {
+			t.Fatalf("first MarkUsedIfUnused = %v, %v; want true, nil", ok, err)
+		}
+		ok, err = s.MarkUsedIfUnused(ctx, "t3")
+		if err != nil || ok {
+			t.Fatalf("second MarkUsedIfUnused = %v, %v; want false, nil", ok, err)
 		}
 		got, _ := s.GetTicket(ctx, "t3")
 		if !got.Used {
 			t.Fatal("ticket should be used")
 		}
-		if err := s.MarkUsed(ctx, "missing"); !errors.Is(err, store.ErrNotFound) {
-			t.Fatalf("err = %v, want ErrNotFound", err)
+		if ok, err := s.MarkUsedIfUnused(ctx, "missing"); err != nil || ok {
+			t.Fatalf("missing MarkUsedIfUnused = %v, %v; want false, nil", ok, err)
+		}
+	})
+
+	t.Run("MarkUsedIfUnusedConcurrent", func(t *testing.T) {
+		s := newStore(t)
+		now := time.Now()
+		if err := s.SaveTicket(ctx, store.Ticket{ID: "cas", Receiver: "admin", CodeHash: []byte{1}, Salt: []byte{1}, CreatedAt: now, ExpiresAt: now.Add(time.Minute)}); err != nil {
+			t.Fatal(err)
+		}
+		const n = 32
+		var wg sync.WaitGroup
+		var wins int32
+		for i := 0; i < n; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				ok, err := s.MarkUsedIfUnused(ctx, "cas")
+				if err != nil {
+					t.Errorf("MarkUsedIfUnused: %v", err)
+					return
+				}
+				if ok {
+					atomic.AddInt32(&wins, 1)
+				}
+			}()
+		}
+		wg.Wait()
+		if wins != 1 {
+			t.Fatalf("wins = %d, want 1", wins)
+		}
+	})
+
+	t.Run("FarFutureTimestamps", func(t *testing.T) {
+		s := newStore(t)
+		future := time.Date(2319, 1, 14, 0, 0, 0, 0, time.UTC)
+		past := time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
+		if err := s.SaveTicket(ctx, store.Ticket{ID: "far", Receiver: "admin", CodeHash: []byte{1}, Salt: []byte{1}, CreatedAt: past, ExpiresAt: future}); err != nil {
+			t.Fatal(err)
+		}
+		got, err := s.GetTicket(ctx, "far")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !got.ExpiresAt.Equal(future) {
+			t.Fatalf("expires = %v, want %v", got.ExpiresAt, future)
+		}
+		if !got.CreatedAt.Equal(past) {
+			t.Fatalf("created = %v, want %v", got.CreatedAt, past)
 		}
 	})
 

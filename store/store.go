@@ -24,8 +24,8 @@ type Store interface {
 	SaveTicket(ctx context.Context, t Ticket) error
 	GetTicket(ctx context.Context, id string) (*Ticket, error)
 	DeleteTicket(ctx context.Context, id string) error
-	IncrAttempt(ctx context.Context, id string) (int, error)
-	MarkUsed(ctx context.Context, id string) error
+	IncrAttemptIfBelow(ctx context.Context, id string, max int) (int, bool, error)
+	MarkUsedIfUnused(ctx context.Context, id string) (bool, error)
 	CountRecent(ctx context.Context, receiver string, window time.Duration) (int, error)
 	LastSentAt(ctx context.Context, receiver string) (time.Time, error)
 	Cleanup(ctx context.Context, now time.Time) error

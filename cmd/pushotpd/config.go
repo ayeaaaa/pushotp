@@ -1,11 +1,24 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"pushotp"
 )
+
+func decodeConfig(raw []byte) (fileConfig, error) {
+	dec := yaml.NewDecoder(bytes.NewReader(raw))
+	dec.KnownFields(true)
+	var fc fileConfig
+	if err := dec.Decode(&fc); err != nil {
+		return fileConfig{}, err
+	}
+	return fc, nil
+}
 
 type fileConfig struct {
 	Server    serverConfig     `yaml:"server"`
@@ -51,7 +64,8 @@ type receiverConfig struct {
 		BotToken string `yaml:"bot_token"`
 		ChatID   string `yaml:"chat_id"`
 	} `yaml:"telegram"`
-	Template string `yaml:"template"`
+	Template string            `yaml:"template"`
+	Config   map[string]string `yaml:"config"`
 }
 
 func (f fileConfig) toConfig() (pushotp.Config, error) {
@@ -88,6 +102,7 @@ func (f fileConfig) toConfig() (pushotp.Config, error) {
 			Pushplus: pushotp.PushplusConfig{Token: r.Pushplus.Token},
 			Telegram: pushotp.TelegramConfig{BotToken: r.Telegram.BotToken, ChatID: r.Telegram.ChatID},
 			Template: r.Template,
+			Config:   r.Config,
 		})
 	}
 	return cfg, nil

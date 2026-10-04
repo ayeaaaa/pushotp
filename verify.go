@@ -97,7 +97,7 @@ func (v *Verifier) channelConfig(r ReceiverConfig) map[string]string {
 	case "telegram":
 		return map[string]string{"bot_token": r.Telegram.BotToken, "chat_id": r.Telegram.ChatID}
 	default:
-		return nil
+		return r.Config
 	}
 }
 
@@ -193,13 +193,19 @@ func (v *Verifier) Verify(ctx context.Context, req VerifyRequest) (*VerifyResult
 		return nil, ErrMaxAttempts
 	}
 	if !equalHash(t.CodeHash, hashCode(t.Salt, req.Code)) {
-		if _, err := v.store.IncrAttempt(ctx, t.ID); err != nil {
+		if _, allowed, err := v.store.IncrAttemptIfBelow(ctx, t.ID, v.cfg.Code.MaxAttempts); err != nil {
 			return nil, err
+		} else if !allowed {
+			return nil, ErrMaxAttempts
 		}
 		return nil, ErrInvalidCode
 	}
-	if err := v.store.MarkUsed(ctx, t.ID); err != nil {
+	ok, err := v.store.MarkUsedIfUnused(ctx, t.ID)
+	if err != nil {
 		return nil, err
+	}
+	if !ok {
+		return nil, ErrUsed
 	}
 	res := &VerifyResult{OK: true}
 	if v.issuer != nil {

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -346,5 +348,56 @@ func TestVerifyIssuerToken(t *testing.T) {
 	}
 	if _, err := v.VerifyToken(res.Token + "x"); err == nil {
 		t.Fatal("tampered token must fail")
+	}
+}
+
+func TestSendCustomChannelConfig(t *testing.T) {
+	var got channel.Target
+	name := registerFake(t, func(_ context.Context, target channel.Target, _ channel.Message) error {
+		got = target
+		return nil
+	})
+	cfg := testConfig(name)
+	cfg.Receivers[0].Config = map[string]string{"endpoint": "https://example.test"}
+	v := newTestVerifier(t, cfg)
+	if _, err := v.Send(context.Background(), SendRequest{Receiver: "admin"}); err != nil {
+		t.Fatal(err)
+	}
+	if got.Config["endpoint"] != "https://example.test" {
+		t.Fatalf("config = %v", got.Config)
+	}
+}
+
+func TestVerifyConcurrentOneTimeUse(t *testing.T) {
+	var sent sentMessage
+	name := registerFake(t, func(_ context.Context, _ channel.Target, msg channel.Message) error {
+		sent = sentMessage{msg: msg}
+		return nil
+	})
+	v := newTestVerifier(t, testConfig(name))
+	tk, err := v.Send(context.Background(), SendRequest{Receiver: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := codeRe.FindString(sent.msg.Content)
+	const n = 16
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	var successes int32
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			res, err := v.Verify(context.Background(), VerifyRequest{TicketID: tk.ID, Code: code})
+			if err == nil && res.OK {
+				atomic.AddInt32(&successes, 1)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	if successes != 1 {
+		t.Fatalf("successes = %d, want 1", successes)
 	}
 }

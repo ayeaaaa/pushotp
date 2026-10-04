@@ -24,7 +24,11 @@ func New(secret string, ttl time.Duration) *Issuer {
 
 func (i *Issuer) Issue(ctx context.Context, claims issuer.Claims) (string, error) {
 	if claims.Exp == 0 {
-		claims.Exp = time.Now().Add(i.ttl).Unix()
+		exp := time.Now().Add(i.ttl).Unix()
+		if now := time.Now().Unix(); exp <= now {
+			exp = now + 1
+		}
+		claims.Exp = exp
 	}
 	payload, err := json.Marshal(claims)
 	if err != nil {
@@ -59,7 +63,7 @@ func (i *Issuer) Verify(ctx context.Context, token string) (*issuer.Claims, erro
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		return nil, issuer.ErrInvalidToken
 	}
-	if time.Now().Unix() >= claims.Exp {
+	if time.Now().Unix() > claims.Exp {
 		return nil, issuer.ErrExpiredToken
 	}
 	return &claims, nil

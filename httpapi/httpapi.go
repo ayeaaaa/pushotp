@@ -4,7 +4,9 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -96,7 +98,7 @@ func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleSend(w http.ResponseWriter, r *http.Request) {
 	var body sendRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
@@ -107,7 +109,7 @@ func (h *Handler) handleSend(w http.ResponseWriter, r *http.Request) {
 	var ttl time.Duration
 	if body.TTL != "" {
 		parsed, err := time.ParseDuration(body.TTL)
-		if err != nil {
+		if err != nil || parsed <= 0 {
 			writeError(w, http.StatusBadRequest, "invalid_request")
 			return
 		}
@@ -124,15 +126,19 @@ func (h *Handler) handleSend(w http.ResponseWriter, r *http.Request) {
 		h.writeVerifierError(w, err)
 		return
 	}
+	remaining := time.Until(tk.ExpiresAt)
+	if remaining < 0 {
+		remaining = 0
+	}
 	writeJSON(w, http.StatusOK, sendResponseBody{
 		TicketID:  tk.ID,
-		ExpiresIn: int64(time.Until(tk.ExpiresAt).Seconds()),
+		ExpiresIn: int64(math.Ceil(remaining.Seconds())),
 	})
 }
 
 func (h *Handler) handleVerify(w http.ResponseWriter, r *http.Request) {
 	var body verifyRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
@@ -146,6 +152,17 @@ func (h *Handler) handleVerify(w http.ResponseWriter, r *http.Request) {
 		out.ExpiresAt = &res.ExpiresAt
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+func decodeJSON(r *http.Request, dst any) error {
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(dst); err != nil {
+		return err
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		return errors.New("trailing data")
+	}
+	return nil
 }
 
 func (h *Handler) writeVerifierError(w http.ResponseWriter, err error) {

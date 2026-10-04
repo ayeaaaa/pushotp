@@ -53,11 +53,12 @@ type TelegramConfig struct {
 }
 
 type ReceiverConfig struct {
-	Name     string         `yaml:"name"`
-	Channel  string         `yaml:"channel"`
-	Pushplus PushplusConfig `yaml:"pushplus"`
-	Telegram TelegramConfig `yaml:"telegram"`
-	Template string         `yaml:"template"`
+	Name     string            `yaml:"name"`
+	Channel  string            `yaml:"channel"`
+	Pushplus PushplusConfig    `yaml:"pushplus"`
+	Telegram TelegramConfig    `yaml:"telegram"`
+	Template string            `yaml:"template"`
+	Config   map[string]string `yaml:"config"`
 }
 
 func (c Config) WithDefaults() Config {
@@ -104,8 +105,8 @@ func (c Config) Validate() error {
 	if c.Issuer.Enabled && c.Issuer.Secret == "" {
 		return fmt.Errorf("%w: issuer enabled but secret is empty", ErrConfig)
 	}
-	if c.Issuer.Enabled && c.Issuer.TTL <= 0 {
-		return fmt.Errorf("%w: issuer ttl must be positive", ErrConfig)
+	if c.Issuer.Enabled && c.Issuer.TTL < time.Second {
+		return fmt.Errorf("%w: issuer ttl must be at least 1s", ErrConfig)
 	}
 	if c.Storage.Type != "memory" && c.Storage.Type != "sqlite" {
 		return fmt.Errorf("%w: unknown storage type %q", ErrConfig, c.Storage.Type)
