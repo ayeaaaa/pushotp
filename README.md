@@ -67,6 +67,33 @@ go run . -config config.yaml
 
 配置 `server.api_key` 后，`/send` 与 `/verify` 需要 `Authorization: Bearer <key>`；`/health` 始终公开。
 
+## 配置参考
+
+配置文件为 YAML，字段如下：
+
+| 字段 | 说明 | 默认 |
+|---|---|---|
+| `server.addr` | HTTP 监听地址 | `:8080` |
+| `server.api_key` | Bearer 鉴权密钥；为空则不鉴权 | 空（不鉴权） |
+| `storage.type` | 存储类型：`memory` 或 `sqlite` | `memory` |
+| `storage.sqlite.path` | SQLite 文件路径（`type: sqlite` 时必填） | - |
+| `code.length` | 验证码位数（4-8） | `6` |
+| `code.ttl` | 验证码有效期，Go duration 字符串（如 `5m`、`30s`） | `5m` |
+| `code.cooldown` | 同一接收人两次发送的最小间隔 | `60s` |
+| `code.max_attempts` | 单张票据最大校验次数 | `5` |
+| `code.max_per_hour` | 每接收人每小时发送上限 | `10` |
+| `issuer.enabled` | 是否在校验成功后签发 HMAC 令牌 | `false` |
+| `issuer.secret` | 令牌签名密钥（启用时必填） | - |
+| `issuer.ttl` | 令牌有效期 | `24h` |
+| `receivers[].name` | 接收人名称，调用时按名指定 | 必填 |
+| `receivers[].channel` | 渠道：`pushplus` 或 `telegram` | 必填 |
+| `receivers[].pushplus.token` | pushplus token | pushplus 必填 |
+| `receivers[].telegram.bot_token` | Telegram Bot Token | telegram 必填 |
+| `receivers[].telegram.chat_id` | Telegram 会话 ID | telegram 必填 |
+| `receivers[].template` | 消息模板，留空用默认文案 | 空 |
+
+模板内置变量：`{code}`、`{ttl}`、`{scene}`、`{receiver}`；自定义变量（如 `{app}`）通过接口/HTTP 请求的 `data` 字段传入。
+
 ## 安全默认值
 
 | 项 | 默认 |
