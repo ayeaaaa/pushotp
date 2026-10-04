@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -36,6 +37,33 @@ func TestDatabaseFilePermissions(t *testing.T) {
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("perm = %o, want 600", info.Mode().Perm())
+	}
+}
+
+func TestURIDSNPermissions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "uri.db")
+	s, err := New("file:" + path + "?mode=rwc")
+	if err != nil {
+		t.Fatalf("New URI DSN: %v", err)
+	}
+	defer s.Close()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("perm = %o, want 600", info.Mode().Perm())
+	}
+}
+
+func TestMemoryDSN(t *testing.T) {
+	s, err := New("file::memory:?cache=shared")
+	if err != nil {
+		t.Fatalf("New memory DSN: %v", err)
+	}
+	defer s.Close()
+	if _, err := s.GetTicket(context.Background(), "missing"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
 }
 

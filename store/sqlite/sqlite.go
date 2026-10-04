@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,7 +40,22 @@ type Store struct {
 	once sync.Once
 }
 
+func dsnFilePath(dsn string) string {
+	p := strings.TrimPrefix(dsn, "file:")
+	if i := strings.IndexByte(p, '?'); i >= 0 {
+		p = p[:i]
+	}
+	return p
+}
+
 func New(path string) (*Store, error) {
+	if p := dsnFilePath(path); p != "" && p != ":memory:" {
+		f, err := os.OpenFile(filepath.Clean(p), os.O_CREATE|os.O_RDWR, 0o600)
+		if err != nil {
+			return nil, fmt.Errorf("sqlite: create db file: %w", err)
+		}
+		_ = f.Close()
+	}
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: open: %w", err)
@@ -53,8 +70,8 @@ func New(path string) (*Store, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("sqlite: migrate legacy timestamps: %w", err)
 	}
-	if path != "" && path != ":memory:" {
-		if err := os.Chmod(path, 0o600); err != nil {
+	if p := dsnFilePath(path); p != "" && p != ":memory:" {
+		if err := os.Chmod(p, 0o600); err != nil {
 			_ = db.Close()
 			return nil, fmt.Errorf("sqlite: chmod: %w", err)
 		}
