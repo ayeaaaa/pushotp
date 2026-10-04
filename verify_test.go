@@ -449,6 +449,22 @@ func TestSendPerReceiverConcurrency(t *testing.T) {
 	}
 }
 
+func TestSendUnknownReceiverDoesNotGrowLocks(t *testing.T) {
+	name := registerFake(t, nil)
+	v := newTestVerifier(t, testConfig(name))
+	for i := 0; i < 100; i++ {
+		if _, err := v.Send(context.Background(), SendRequest{Receiver: "ghost"}); !errors.Is(err, ErrReceiverNotFound) {
+			t.Fatalf("err = %v, want ErrReceiverNotFound", err)
+		}
+	}
+	v.lockMu.Lock()
+	n := len(v.sendLocks)
+	v.lockMu.Unlock()
+	if n != 0 {
+		t.Fatalf("sendLocks grew to %d, want 0", n)
+	}
+}
+
 func TestTicketTimestampsAreMillisecondAligned(t *testing.T) {
 	name := registerFake(t, nil)
 	v := newTestVerifier(t, testConfig(name))

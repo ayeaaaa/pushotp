@@ -119,14 +119,14 @@ func (v *Verifier) channelConfig(r ReceiverConfig) map[string]string {
 }
 
 func (v *Verifier) Send(ctx context.Context, req SendRequest) (*Ticket, error) {
-	lock := v.receiverLock(req.Receiver)
-	lock.Lock()
-	defer lock.Unlock()
-
 	rc, ok := v.receiver(req.Receiver)
 	if !ok {
 		return nil, ErrReceiverNotFound
 	}
+	lock := v.receiverLock(req.Receiver)
+	lock.Lock()
+	defer lock.Unlock()
+
 	now := v.now().Truncate(time.Millisecond)
 	last, err := v.store.LastSentAt(ctx, req.Receiver)
 	if err != nil {

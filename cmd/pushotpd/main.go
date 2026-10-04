@@ -86,7 +86,7 @@ func main() {
 }
 
 func isLoopbackHost(host string) bool {
-	if host == "" || host == "localhost" {
+	if host == "localhost" {
 		return true
 	}
 	ip := net.ParseIP(host)

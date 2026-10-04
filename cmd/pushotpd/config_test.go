@@ -75,7 +75,7 @@ func TestFileConfigToConfig(t *testing.T) {
 
 func TestIsLoopbackHost(t *testing.T) {
 	for host, want := range map[string]bool{
-		"":            true,
+		"":            false,
 		"localhost":   true,
 		"127.0.0.1":   true,
 		"::1":         true,
