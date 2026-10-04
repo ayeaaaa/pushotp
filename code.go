@@ -19,7 +19,7 @@ func generateCode(length int) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		buf[i] = byte('0' + n.Int64())
+		buf[i] = "0123456789"[n.Int64()]
 	}
 	return string(buf), nil
 }

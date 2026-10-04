@@ -29,5 +29,6 @@ type Store interface {
 	CountRecent(ctx context.Context, receiver string, window time.Duration) (int, error)
 	LastSentAt(ctx context.Context, receiver string) (time.Time, error)
 	Cleanup(ctx context.Context, now time.Time) error
+	Ping(ctx context.Context) error
 	Close() error
 }

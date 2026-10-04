@@ -67,6 +67,8 @@ go run . -config config.yaml
 
 配置 `server.api_key` 后，`/send` 与 `/verify` 需要 `Authorization: Bearer <key>`；`/health` 始终公开。
 
+请求中的 `length` 只能大于等于配置的 `code.length`（防止降级位数便于暴力破解）；`ttl` 上限为 24h。
+
 ## 配置参考
 
 配置文件为 YAML，字段如下：
@@ -106,7 +108,7 @@ go run . -config config.yaml
 | 每接收人配额 | 10 次/小时 |
 | 令牌有效期 | 24 小时 |
 
-验证码只存加盐 SHA-256 哈希；恒定时间比较；一次性使用；发送失败不占配额。
+验证码只存加盐 SHA-256 哈希；恒定时间比较；一次性使用；发送失败不占配额。公网部署必须设置 `server.api_key`（或置于反向代理/内网之后），否则任何人都能调用发码/校验接口。
 
 ## 存储
 

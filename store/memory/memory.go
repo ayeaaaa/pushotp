@@ -140,6 +140,10 @@ func (s *Store) Cleanup(ctx context.Context, now time.Time) error {
 	return nil
 }
 
+func (s *Store) Ping(ctx context.Context) error {
+	return nil
+}
+
 func (s *Store) Close() error {
 	s.once.Do(func() { close(s.stop) })
 	<-s.done

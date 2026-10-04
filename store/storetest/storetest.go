@@ -210,6 +210,13 @@ func Run(t *testing.T, newStore func(t *testing.T) store.Store) {
 		}
 	})
 
+	t.Run("Ping", func(t *testing.T) {
+		s := newStore(t)
+		if err := s.Ping(ctx); err != nil {
+			t.Fatalf("Ping: %v", err)
+		}
+	})
+
 	t.Run("Cleanup", func(t *testing.T) {
 		s := newStore(t)
 		now := time.Now()

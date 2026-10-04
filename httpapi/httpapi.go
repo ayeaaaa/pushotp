@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,10 @@ import (
 
 	"pushotp"
 )
+
+const maxBodyBytes = 64 << 10
+
+const maxTTL = 24 * time.Hour
 
 type Handler struct {
 	v      *pushotp.Verifier
@@ -76,14 +81,15 @@ var errorMessages = map[string]string{
 	"max_attempts":        "too many attempts",
 	"receiver_not_found":  "receiver not found",
 	"channel_send_failed": "failed to send verification code",
+	"request_too_large":   "request body too large",
 	"internal":            "internal error",
 }
 
 func (h *Handler) auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.apiKey != "" {
-			token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-			if token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(h.apiKey)) != 1 {
+			token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+			if !ok || token == "" || subtle.ConstantTimeCompare(hashKey(token), hashKey(h.apiKey)) != 1 {
 				writeError(w, http.StatusUnauthorized, "unauthorized")
 				return
 			}
@@ -92,13 +98,28 @@ func (h *Handler) auth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+func hashKey(s string) []byte {
+	sum := sha256.Sum256([]byte(s))
+	return sum[:]
+}
+
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if err := h.v.Ping(r.Context()); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "degraded"})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *Handler) handleSend(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	var body sendRequestBody
 	if err := decodeJSON(r, &body); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "request_too_large")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
@@ -109,7 +130,7 @@ func (h *Handler) handleSend(w http.ResponseWriter, r *http.Request) {
 	var ttl time.Duration
 	if body.TTL != "" {
 		parsed, err := time.ParseDuration(body.TTL)
-		if err != nil || parsed <= 0 {
+		if err != nil || parsed <= 0 || parsed > maxTTL {
 			writeError(w, http.StatusBadRequest, "invalid_request")
 			return
 		}
@@ -137,8 +158,14 @@ func (h *Handler) handleSend(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleVerify(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	var body verifyRequestBody
 	if err := decodeJSON(r, &body); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "request_too_large")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}

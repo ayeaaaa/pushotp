@@ -113,9 +113,12 @@ func TestSendRateLimited(t *testing.T) {
 	cfg := testConfig(name)
 	cfg.Code.MaxPerHour = 1
 	v := newTestVerifier(t, cfg)
+	base := time.Now()
+	v.now = func() time.Time { return base }
 	if _, err := v.Send(context.Background(), SendRequest{Receiver: "admin"}); err != nil {
 		t.Fatalf("first Send: %v", err)
 	}
+	v.now = func() time.Time { return base.Add(time.Millisecond) }
 	if _, err := v.Send(context.Background(), SendRequest{Receiver: "admin"}); !errors.Is(err, ErrRateLimited) {
 		t.Fatalf("err = %v, want ErrRateLimited", err)
 	}
@@ -177,7 +180,7 @@ func TestSendCustomLengthAndData(t *testing.T) {
 	v := newTestVerifier(t, cfg)
 	if _, err := v.Send(context.Background(), SendRequest{
 		Receiver: "admin",
-		Length:   4,
+		Length:   8,
 		Data:     map[string]string{"app": "面板"},
 	}); err != nil {
 		t.Fatalf("Send: %v", err)
@@ -185,8 +188,8 @@ func TestSendCustomLengthAndData(t *testing.T) {
 	if !strings.HasPrefix(content, "【面板】") {
 		t.Fatalf("content = %q", content)
 	}
-	if code := codeRe.FindString(content); len(code) != 4 {
-		t.Fatalf("content %q has no 4-digit code", content)
+	if code := codeRe.FindString(content); len(code) != 8 {
+		t.Fatalf("content %q has no 8-digit code", content)
 	}
 }
 
@@ -365,6 +368,96 @@ func TestSendCustomChannelConfig(t *testing.T) {
 	}
 	if got.Config["endpoint"] != "https://example.test" {
 		t.Fatalf("config = %v", got.Config)
+	}
+}
+
+func TestSendCannotDowngradeLength(t *testing.T) {
+	var content string
+	name := registerFake(t, func(_ context.Context, _ channel.Target, msg channel.Message) error {
+		content = msg.Content
+		return nil
+	})
+	v := newTestVerifier(t, testConfig(name))
+	if _, err := v.Send(context.Background(), SendRequest{Receiver: "admin", Length: 4}); err != nil {
+		t.Fatal(err)
+	}
+	if code := codeRe.FindString(content); len(code) != 6 {
+		t.Fatalf("code length = %d, want 6 (downgrade must be ignored)", len(code))
+	}
+}
+
+func TestSendCanceledCallerContextStillCounts(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	name := registerFake(t, func(context.Context, channel.Target, channel.Message) error {
+		cancel()
+		return nil
+	})
+	cfg := testConfig(name)
+	cfg.Code.Cooldown = time.Hour
+	v := newTestVerifier(t, cfg)
+	if _, err := v.Send(ctx, SendRequest{Receiver: "admin"}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	count, err := v.store.CountRecent(context.Background(), "admin", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("count = %d, want 1 (send must count even if caller cancels)", count)
+	}
+	if _, err := v.Send(context.Background(), SendRequest{Receiver: "admin"}); !errors.Is(err, ErrCooldown) {
+		t.Fatalf("err = %v, want ErrCooldown", err)
+	}
+}
+
+func TestSendPerReceiverConcurrency(t *testing.T) {
+	entered := make(chan string, 2)
+	release := make(chan struct{})
+	name := registerFake(t, func(_ context.Context, target channel.Target, _ channel.Message) error {
+		entered <- target.Receiver
+		<-release
+		return nil
+	})
+	cfg := testConfig(name)
+	cfg.Receivers = []ReceiverConfig{{Name: "a", Channel: name}, {Name: "b", Channel: name}}
+	v := newTestVerifier(t, cfg)
+	var wg sync.WaitGroup
+	errs := make(chan error, 2)
+	for _, r := range []string{"a", "b"} {
+		wg.Add(1)
+		go func(r string) {
+			defer wg.Done()
+			_, err := v.Send(context.Background(), SendRequest{Receiver: r})
+			errs <- err
+		}(r)
+	}
+	timeout := time.After(2 * time.Second)
+	for i := 0; i < 2; i++ {
+		select {
+		case <-entered:
+		case <-timeout:
+			t.Fatal("sends are serialized across receivers")
+		}
+	}
+	close(release)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestTicketTimestampsAreMillisecondAligned(t *testing.T) {
+	name := registerFake(t, nil)
+	v := newTestVerifier(t, testConfig(name))
+	tk, err := v.Send(context.Background(), SendRequest{Receiver: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !tk.ExpiresAt.Equal(tk.ExpiresAt.Truncate(time.Millisecond)) {
+		t.Fatalf("ExpiresAt = %v not ms-aligned", tk.ExpiresAt)
 	}
 }
 

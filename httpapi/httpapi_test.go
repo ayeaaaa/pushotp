@@ -155,6 +155,10 @@ func TestAPIKey(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("wrong key status = %d", rec.Code)
 	}
+	rec = doJSON(t, h, http.MethodPost, "/api/v1/send", body, map[string]string{"Authorization": "secret"})
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("bare key status = %d, want 401", rec.Code)
+	}
 	rec = doJSON(t, h, http.MethodPost, "/api/v1/send", body, map[string]string{"Authorization": "Bearer secret"})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("correct key status = %d body = %s", rec.Code, rec.Body)
@@ -235,6 +239,27 @@ func TestTrailingGarbage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/send", strings.NewReader(`{"receiver":"admin"} trailing`))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest || decodeErrorCode(t, rec) != "invalid_request" {
+		t.Fatalf("status = %d body = %s", rec.Code, rec.Body)
+	}
+}
+
+func TestBodyTooLarge(t *testing.T) {
+	name := registerFake(t, nil)
+	h := newHandler(t, baseConfig(name), "")
+	body := `{"receiver":"admin","data":{"x":"` + strings.Repeat("A", maxBodyBytes+1) + `"}}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/send", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusRequestEntityTooLarge || decodeErrorCode(t, rec) != "request_too_large" {
+		t.Fatalf("status = %d body = %s", rec.Code, rec.Body)
+	}
+}
+
+func TestTTLTooLarge(t *testing.T) {
+	name := registerFake(t, nil)
+	h := newHandler(t, baseConfig(name), "")
+	rec := doJSON(t, h, http.MethodPost, "/api/v1/send", map[string]any{"receiver": "admin", "ttl": "25h"}, nil)
 	if rec.Code != http.StatusBadRequest || decodeErrorCode(t, rec) != "invalid_request" {
 		t.Fatalf("status = %d body = %s", rec.Code, rec.Body)
 	}

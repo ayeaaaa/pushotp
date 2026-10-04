@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -20,6 +21,22 @@ func TestSQLiteContract(t *testing.T) {
 		t.Cleanup(func() { s.Close() })
 		return s
 	})
+}
+
+func TestDatabaseFilePermissions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "perm.db")
+	s, err := New(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("perm = %o, want 600", info.Mode().Perm())
+	}
 }
 
 func TestMigratesLegacyNanoTimestamps(t *testing.T) {

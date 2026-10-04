@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -51,6 +52,12 @@ func New(path string) (*Store, error) {
 		WHERE ABS(created_at) >= ? OR ABS(expires_at) >= ?`, legacyNanoThreshold, legacyNanoThreshold); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("sqlite: migrate legacy timestamps: %w", err)
+	}
+	if path != "" && path != ":memory:" {
+		if err := os.Chmod(path, 0o600); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("sqlite: chmod: %w", err)
+		}
 	}
 	s := &Store{db: db, stop: make(chan struct{}), done: make(chan struct{})}
 	go s.janitor()
@@ -186,6 +193,10 @@ func (s *Store) Cleanup(ctx context.Context, now time.Time) error {
 		return fmt.Errorf("sqlite: cleanup: %w", err)
 	}
 	return nil
+}
+
+func (s *Store) Ping(ctx context.Context) error {
+	return s.db.PingContext(ctx)
 }
 
 func (s *Store) Close() error {

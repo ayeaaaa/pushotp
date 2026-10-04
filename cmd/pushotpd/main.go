@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -44,6 +45,13 @@ func main() {
 	}
 	defer v.Close()
 
+	if cfg.Server.APIKey == "" {
+		host, _, err := net.SplitHostPort(cfg.Server.Addr)
+		if err == nil && !isLoopbackHost(host) {
+			logger.Warn("api_key is empty and server may be reachable from other hosts; /send and /verify will accept unauthenticated requests", "addr", cfg.Server.Addr)
+		}
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.Server.Addr,
 		Handler:           httpapi.New(v, cfg.Server.APIKey, logger),
@@ -52,9 +60,15 @@ func main() {
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
+	ln, err := net.Listen("tcp", cfg.Server.Addr)
+	if err != nil {
+		logger.Error("listen", "err", err)
+		_ = v.Close()
+		os.Exit(1)
+	}
+	logger.Info("pushotpd listening", "addr", ln.Addr().String())
 	go func() {
-		logger.Info("pushotpd listening", "addr", cfg.Server.Addr)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 			logger.Error("server error", "err", err)
 			os.Exit(1)
 		}
@@ -69,4 +83,12 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("shutdown", "err", err)
 	}
+}
+
+func isLoopbackHost(host string) bool {
+	if host == "" || host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

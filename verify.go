@@ -18,13 +18,14 @@ import (
 )
 
 type Verifier struct {
-	cfg      Config
-	store    store.Store
-	issuer   issuer.Issuer
-	channels map[string]channel.Channel
-	now      func() time.Time
-	logger   *slog.Logger
-	sendMu   sync.Mutex
+	cfg       Config
+	store     store.Store
+	issuer    issuer.Issuer
+	channels  map[string]channel.Channel
+	now       func() time.Time
+	logger    *slog.Logger
+	lockMu    sync.Mutex
+	sendLocks map[string]*sync.Mutex
 }
 
 func New(cfg Config) (*Verifier, error) {
@@ -50,12 +51,13 @@ func New(cfg Config) (*Verifier, error) {
 		iss = hmacissuer.New(cfg.Issuer.Secret, cfg.Issuer.TTL)
 	}
 	return &Verifier{
-		cfg:      cfg,
-		store:    st,
-		issuer:   iss,
-		channels: chans,
-		now:      time.Now,
-		logger:   slog.Default(),
+		cfg:       cfg,
+		store:     st,
+		issuer:    iss,
+		channels:  chans,
+		now:       time.Now,
+		logger:    slog.Default(),
+		sendLocks: make(map[string]*sync.Mutex),
 	}, nil
 }
 
@@ -90,6 +92,21 @@ func (v *Verifier) receiver(name string) (ReceiverConfig, bool) {
 	return ReceiverConfig{}, false
 }
 
+func (v *Verifier) receiverLock(name string) *sync.Mutex {
+	v.lockMu.Lock()
+	defer v.lockMu.Unlock()
+	l, ok := v.sendLocks[name]
+	if !ok {
+		l = &sync.Mutex{}
+		v.sendLocks[name] = l
+	}
+	return l
+}
+
+func (v *Verifier) Ping(ctx context.Context) error {
+	return v.store.Ping(ctx)
+}
+
 func (v *Verifier) channelConfig(r ReceiverConfig) map[string]string {
 	switch r.Channel {
 	case "pushplus":
@@ -102,14 +119,15 @@ func (v *Verifier) channelConfig(r ReceiverConfig) map[string]string {
 }
 
 func (v *Verifier) Send(ctx context.Context, req SendRequest) (*Ticket, error) {
-	v.sendMu.Lock()
-	defer v.sendMu.Unlock()
+	lock := v.receiverLock(req.Receiver)
+	lock.Lock()
+	defer lock.Unlock()
 
 	rc, ok := v.receiver(req.Receiver)
 	if !ok {
 		return nil, ErrReceiverNotFound
 	}
-	now := v.now()
+	now := v.now().Truncate(time.Millisecond)
 	last, err := v.store.LastSentAt(ctx, req.Receiver)
 	if err != nil {
 		return nil, err
@@ -125,7 +143,7 @@ func (v *Verifier) Send(ctx context.Context, req SendRequest) (*Ticket, error) {
 		return nil, ErrRateLimited
 	}
 	length := v.cfg.Code.Length
-	if req.Length > 0 {
+	if req.Length > length {
 		length = req.Length
 	}
 	code, err := generateCode(length)
@@ -165,7 +183,9 @@ func (v *Verifier) Send(ctx context.Context, req SendRequest) (*Ticket, error) {
 	})
 	msg := channel.Message{Title: "验证码", Content: content}
 	target := channel.Target{Receiver: req.Receiver, Config: v.channelConfig(rc)}
-	if err := v.channels[req.Receiver].Send(ctx, target, msg); err != nil {
+	sendCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+	defer cancel()
+	if err := v.channels[req.Receiver].Send(sendCtx, target, msg); err != nil {
 		if delErr := v.store.DeleteTicket(context.WithoutCancel(ctx), id); delErr != nil {
 			v.logger.Warn("delete failed-send ticket", "err", delErr)
 		}

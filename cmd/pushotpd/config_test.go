@@ -73,6 +73,21 @@ func TestFileConfigToConfig(t *testing.T) {
 	}
 }
 
+func TestIsLoopbackHost(t *testing.T) {
+	for host, want := range map[string]bool{
+		"":            true,
+		"localhost":   true,
+		"127.0.0.1":   true,
+		"::1":         true,
+		"0.0.0.0":     false,
+		"192.168.1.5": false,
+	} {
+		if got := isLoopbackHost(host); got != want {
+			t.Fatalf("isLoopbackHost(%q) = %v, want %v", host, got, want)
+		}
+	}
+}
+
 func TestDecodeConfigRejectsUnknownFields(t *testing.T) {
 	if _, err := decodeConfig([]byte("server:\n  api_kye: x\n")); err == nil {
 		t.Fatal("expected unknown field error")
