@@ -1,4 +1,4 @@
-module pushotp
+module github.com/ayeaaaa/pushotp
 
 go 1.22.2
 

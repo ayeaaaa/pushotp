@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"pushotp"
-	"pushotp/httpapi"
+	"github.com/ayeaaaa/pushotp"
+	"github.com/ayeaaaa/pushotp/httpapi"
 )
 
 func main() {

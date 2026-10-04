@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"pushotp/store"
+	"github.com/ayeaaaa/pushotp/store"
 )
 
 type Store struct {

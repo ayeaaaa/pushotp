@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"time"
 
-	"pushotp/channel"
+	"github.com/ayeaaaa/pushotp/channel"
 )
 
 const DefaultBaseURL = "https://api.telegram.org"

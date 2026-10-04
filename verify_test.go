@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"pushotp/channel"
+	"github.com/ayeaaaa/pushotp/channel"
 )
 
 var codeRe = regexp.MustCompile(`\d{4,8}`)

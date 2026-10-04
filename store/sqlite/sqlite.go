@@ -13,7 +13,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"pushotp/store"
+	"github.com/ayeaaaa/pushotp/store"
 )
 
 const schema = `

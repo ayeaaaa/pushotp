@@ -7,7 +7,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"pushotp"
+	"github.com/ayeaaaa/pushotp"
 )
 
 func decodeConfig(raw []byte) (fileConfig, error) {

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"pushotp/issuer"
+	"github.com/ayeaaaa/pushotp/issuer"
 )
 
 type Issuer struct {

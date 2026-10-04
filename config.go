@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"pushotp/channel"
+	"github.com/ayeaaaa/pushotp/channel"
 )
 
 type Config struct {

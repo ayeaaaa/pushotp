@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"pushotp/channel"
+	"github.com/ayeaaaa/pushotp/channel"
 )
 
 const DefaultBaseURL = "https://www.pushplus.plus"

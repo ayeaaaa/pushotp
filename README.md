@@ -2,6 +2,14 @@
 
 通过 pushplus（微信）或 Telegram 发送动态验证码并校验的 Go 模块，可选签发短期 HMAC 令牌。支持多接收人、内存/SQLite 存储，附带可选 HTTP 服务入口。
 
+## 安装
+
+```bash
+go get github.com/ayeaaaa/pushotp
+```
+
+预编译的 `pushotpd` 单文件（Linux/macOS/Windows）见 [Releases](https://github.com/ayeaaaa/pushotp/releases)。
+
 ## 库用法
 
 ```go
@@ -12,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"pushotp"
+	"github.com/ayeaaaa/pushotp"
 )
 
 func main() {
@@ -58,6 +66,8 @@ cd cmd/pushotpd
 cp config.example.yaml config.yaml
 go run . -config config.yaml
 ```
+
+或直接使用 [Releases](https://github.com/ayeaaaa/pushotp/releases) 下载的二进制：`./pushotpd -config config.yaml`。
 
 | 方法 | 路径 | 请求 | 响应 |
 |---|---|---|---|

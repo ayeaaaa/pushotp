@@ -3,7 +3,7 @@ package pushotp
 import (
 	"time"
 
-	"pushotp/issuer"
+	"github.com/ayeaaaa/pushotp/issuer"
 )
 
 type Ticket struct {

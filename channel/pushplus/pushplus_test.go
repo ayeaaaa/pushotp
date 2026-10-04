@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"pushotp/channel"
+	"github.com/ayeaaaa/pushotp/channel"
 )
 
 func TestSendSuccess(t *testing.T) {

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"pushotp"
+	"github.com/ayeaaaa/pushotp"
 )
 
 const maxBodyBytes = 64 << 10

@@ -1,6 +1,6 @@
 package pushotp
 
 import (
-	_ "pushotp/channel/pushplus"
-	_ "pushotp/channel/telegram"
+	_ "github.com/ayeaaaa/pushotp/channel/pushplus"
+	_ "github.com/ayeaaaa/pushotp/channel/telegram"
 )

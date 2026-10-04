@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"pushotp/issuer"
+	"github.com/ayeaaaa/pushotp/issuer"
 )
 
 func TestIssueVerifyRoundtrip(t *testing.T) {

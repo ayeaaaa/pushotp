@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"pushotp/channel"
+	"github.com/ayeaaaa/pushotp/channel"
 )
 
 func TestSendSuccess(t *testing.T) {

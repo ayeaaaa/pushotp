@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"pushotp"
-	"pushotp/channel"
+	"github.com/ayeaaaa/pushotp"
+	"github.com/ayeaaaa/pushotp/channel"
 )
 
 var codeRe = regexp.MustCompile(`\d{4,8}`)

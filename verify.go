@@ -8,13 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"pushotp/channel"
-	"pushotp/issuer"
-	hmacissuer "pushotp/issuer/hmac"
-	"pushotp/store"
-	"pushotp/store/memory"
-	"pushotp/store/sqlite"
-	"pushotp/template"
+	"github.com/ayeaaaa/pushotp/channel"
+	"github.com/ayeaaaa/pushotp/issuer"
+	hmacissuer "github.com/ayeaaaa/pushotp/issuer/hmac"
+	"github.com/ayeaaaa/pushotp/store"
+	"github.com/ayeaaaa/pushotp/store/memory"
+	"github.com/ayeaaaa/pushotp/store/sqlite"
+	"github.com/ayeaaaa/pushotp/template"
 )
 
 type Verifier struct {

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"pushotp/store"
-	"pushotp/store/storetest"
+	"github.com/ayeaaaa/pushotp/store"
+	"github.com/ayeaaaa/pushotp/store/storetest"
 )
 
 func TestSQLiteContract(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"pushotp/store"
+	"github.com/ayeaaaa/pushotp/store"
 )
 
 func Run(t *testing.T, newStore func(t *testing.T) store.Store) {
