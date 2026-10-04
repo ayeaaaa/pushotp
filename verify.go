@@ -2,6 +2,7 @@ package pushotp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -169,4 +170,60 @@ func (v *Verifier) Send(ctx context.Context, req SendRequest) (*Ticket, error) {
 		return nil, fmt.Errorf("%w: %w", ErrChannelSend, err)
 	}
 	return &t, nil
+}
+
+func (v *Verifier) Verify(ctx context.Context, req VerifyRequest) (*VerifyResult, error) {
+	t, err := v.store.GetTicket(ctx, req.TicketID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, ErrTicketNotFound
+		}
+		return nil, err
+	}
+	now := v.now()
+	if t.Used {
+		return nil, ErrUsed
+	}
+	if now.After(t.ExpiresAt) {
+		return nil, ErrExpired
+	}
+	if t.Attempts >= v.cfg.Code.MaxAttempts {
+		return nil, ErrMaxAttempts
+	}
+	if !equalHash(t.CodeHash, hashCode(t.Salt, req.Code)) {
+		if _, err := v.store.IncrAttempt(ctx, t.ID); err != nil {
+			return nil, err
+		}
+		return nil, ErrInvalidCode
+	}
+	if err := v.store.MarkUsed(ctx, t.ID); err != nil {
+		return nil, err
+	}
+	res := &VerifyResult{OK: true}
+	if v.issuer != nil {
+		nonce, err := newID()
+		if err != nil {
+			return nil, err
+		}
+		claims := issuer.Claims{
+			Receiver: t.Receiver,
+			Scene:    t.Scene,
+			Exp:      now.Add(v.cfg.Issuer.TTL).Unix(),
+			Nonce:    nonce,
+		}
+		token, err := v.issuer.Issue(ctx, claims)
+		if err != nil {
+			return nil, err
+		}
+		res.Token = token
+		res.ExpiresAt = time.Unix(claims.Exp, 0)
+	}
+	return res, nil
+}
+
+func (v *Verifier) VerifyToken(token string) (*Claims, error) {
+	if v.issuer == nil {
+		return nil, fmt.Errorf("%w: issuer is disabled", ErrConfig)
+	}
+	return v.issuer.Verify(context.Background(), token)
 }

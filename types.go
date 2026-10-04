@@ -3,10 +3,13 @@ package pushotp
 import (
 	"time"
 
+	"pushotp/issuer"
 	"pushotp/store"
 )
 
 type Ticket = store.Ticket
+
+type Claims = issuer.Claims
 
 type SendRequest struct {
 	Receiver string

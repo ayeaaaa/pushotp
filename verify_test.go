@@ -187,3 +187,164 @@ func TestSendCustomLengthAndData(t *testing.T) {
 		t.Fatalf("content %q has no 4-digit code", content)
 	}
 }
+
+func TestVerifySuccess(t *testing.T) {
+	var sent sentMessage
+	name := registerFake(t, func(_ context.Context, target channel.Target, msg channel.Message) error {
+		sent = sentMessage{target: target, msg: msg}
+		return nil
+	})
+	v := newTestVerifier(t, testConfig(name))
+	tk, err := v.Send(context.Background(), SendRequest{Receiver: "admin", Scene: "login"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := codeRe.FindString(sent.msg.Content)
+	res, err := v.Verify(context.Background(), VerifyRequest{TicketID: tk.ID, Code: code})
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if !res.OK {
+		t.Fatal("expected OK")
+	}
+	if res.Token != "" {
+		t.Fatalf("token = %q, want empty when issuer disabled", res.Token)
+	}
+}
+
+func TestVerifyWrongCode(t *testing.T) {
+	var sent sentMessage
+	name := registerFake(t, func(_ context.Context, _ channel.Target, msg channel.Message) error {
+		sent = sentMessage{msg: msg}
+		return nil
+	})
+	v := newTestVerifier(t, testConfig(name))
+	tk, err := v.Send(context.Background(), SendRequest{Receiver: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := codeRe.FindString(sent.msg.Content)
+	wrong := "000000"
+	if wrong == code {
+		wrong = "111111"
+	}
+	if _, err := v.Verify(context.Background(), VerifyRequest{TicketID: tk.ID, Code: wrong}); !errors.Is(err, ErrInvalidCode) {
+		t.Fatalf("err = %v, want ErrInvalidCode", err)
+	}
+	stored, err := v.store.GetTicket(context.Background(), tk.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Attempts != 1 {
+		t.Fatalf("attempts = %d, want 1", stored.Attempts)
+	}
+}
+
+func TestVerifyMaxAttempts(t *testing.T) {
+	var sent sentMessage
+	name := registerFake(t, func(_ context.Context, _ channel.Target, msg channel.Message) error {
+		sent = sentMessage{msg: msg}
+		return nil
+	})
+	cfg := testConfig(name)
+	cfg.Code.MaxAttempts = 2
+	v := newTestVerifier(t, cfg)
+	tk, err := v.Send(context.Background(), SendRequest{Receiver: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := codeRe.FindString(sent.msg.Content)
+	wrong := "000000"
+	if wrong == code {
+		wrong = "111111"
+	}
+	for i := 0; i < 2; i++ {
+		if _, err := v.Verify(context.Background(), VerifyRequest{TicketID: tk.ID, Code: wrong}); !errors.Is(err, ErrInvalidCode) {
+			t.Fatalf("attempt %d: err = %v, want ErrInvalidCode", i+1, err)
+		}
+	}
+	if _, err := v.Verify(context.Background(), VerifyRequest{TicketID: tk.ID, Code: code}); !errors.Is(err, ErrMaxAttempts) {
+		t.Fatalf("err = %v, want ErrMaxAttempts", err)
+	}
+}
+
+func TestVerifyUsed(t *testing.T) {
+	var sent sentMessage
+	name := registerFake(t, func(_ context.Context, _ channel.Target, msg channel.Message) error {
+		sent = sentMessage{msg: msg}
+		return nil
+	})
+	v := newTestVerifier(t, testConfig(name))
+	tk, err := v.Send(context.Background(), SendRequest{Receiver: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := codeRe.FindString(sent.msg.Content)
+	if _, err := v.Verify(context.Background(), VerifyRequest{TicketID: tk.ID, Code: code}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.Verify(context.Background(), VerifyRequest{TicketID: tk.ID, Code: code}); !errors.Is(err, ErrUsed) {
+		t.Fatalf("err = %v, want ErrUsed", err)
+	}
+}
+
+func TestVerifyExpired(t *testing.T) {
+	var sent sentMessage
+	name := registerFake(t, func(_ context.Context, _ channel.Target, msg channel.Message) error {
+		sent = sentMessage{msg: msg}
+		return nil
+	})
+	v := newTestVerifier(t, testConfig(name))
+	base := time.Now()
+	v.now = func() time.Time { return base }
+	tk, err := v.Send(context.Background(), SendRequest{Receiver: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := codeRe.FindString(sent.msg.Content)
+	v.now = func() time.Time { return base.Add(10 * time.Minute) }
+	if _, err := v.Verify(context.Background(), VerifyRequest{TicketID: tk.ID, Code: code}); !errors.Is(err, ErrExpired) {
+		t.Fatalf("err = %v, want ErrExpired", err)
+	}
+}
+
+func TestVerifyUnknownTicket(t *testing.T) {
+	name := registerFake(t, nil)
+	v := newTestVerifier(t, testConfig(name))
+	if _, err := v.Verify(context.Background(), VerifyRequest{TicketID: "nope", Code: "123456"}); !errors.Is(err, ErrTicketNotFound) {
+		t.Fatalf("err = %v, want ErrTicketNotFound", err)
+	}
+}
+
+func TestVerifyIssuerToken(t *testing.T) {
+	var sent sentMessage
+	name := registerFake(t, func(_ context.Context, _ channel.Target, msg channel.Message) error {
+		sent = sentMessage{msg: msg}
+		return nil
+	})
+	cfg := testConfig(name)
+	cfg.Issuer = IssuerConfig{Enabled: true, Secret: "s3cret", TTL: time.Hour}
+	v := newTestVerifier(t, cfg)
+	tk, err := v.Send(context.Background(), SendRequest{Receiver: "admin", Scene: "login"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := codeRe.FindString(sent.msg.Content)
+	res, err := v.Verify(context.Background(), VerifyRequest{TicketID: tk.ID, Code: code})
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if res.Token == "" || res.ExpiresAt.IsZero() {
+		t.Fatalf("expected token, got %+v", res)
+	}
+	claims, err := v.VerifyToken(res.Token)
+	if err != nil {
+		t.Fatalf("VerifyToken: %v", err)
+	}
+	if claims.Receiver != "admin" || claims.Scene != "login" {
+		t.Fatalf("claims = %+v", claims)
+	}
+	if _, err := v.VerifyToken(res.Token + "x"); err == nil {
+		t.Fatal("tampered token must fail")
+	}
+}
