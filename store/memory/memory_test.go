@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"pushotp/store"
+	"pushotp/store/storetest"
 )
 
 func TestMemoryBasics(t *testing.T) {
@@ -32,4 +33,12 @@ func TestMemoryBasics(t *testing.T) {
 	if !got.Used {
 		t.Fatal("ticket should be used")
 	}
+}
+
+func TestMemoryContract(t *testing.T) {
+	storetest.Run(t, func(t *testing.T) store.Store {
+		s := New()
+		t.Cleanup(func() { s.Close() })
+		return s
+	})
 }
