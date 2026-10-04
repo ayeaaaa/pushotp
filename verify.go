@@ -165,7 +165,7 @@ func (v *Verifier) Send(ctx context.Context, req SendRequest) (*Ticket, error) {
 	msg := channel.Message{Title: "验证码", Content: content}
 	target := channel.Target{Receiver: req.Receiver, Config: v.channelConfig(rc)}
 	if err := v.channels[req.Receiver].Send(ctx, target, msg); err != nil {
-		_ = v.store.DeleteTicket(ctx, id)
+		_ = v.store.DeleteTicket(context.WithoutCancel(ctx), id)
 		return nil, fmt.Errorf("%w: %w", ErrChannelSend, err)
 	}
 	return &t, nil

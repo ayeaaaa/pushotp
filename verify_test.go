@@ -136,6 +136,34 @@ func TestSendChannelFailureDeletesTicket(t *testing.T) {
 	}
 }
 
+func TestSendChannelFailureCleansUpWithCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	name := registerFake(t, func(context.Context, channel.Target, channel.Message) error {
+		cancel()
+		return errors.New("send failed")
+	})
+	cfg := testConfig(name)
+	cfg.Storage = StorageConfig{Type: "sqlite", SQLite: SQLiteConfig{Path: t.TempDir() + "/test.db"}}
+	v := newTestVerifier(t, cfg)
+	if _, err := v.Send(ctx, SendRequest{Receiver: "admin"}); !errors.Is(err, ErrChannelSend) {
+		t.Fatalf("err = %v, want ErrChannelSend", err)
+	}
+	count, err := v.store.CountRecent(context.Background(), "admin", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("count = %d, want 0 after failed send with canceled ctx", count)
+	}
+	last, err := v.store.LastSentAt(context.Background(), "admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !last.IsZero() {
+		t.Fatalf("last = %v, want zero", last)
+	}
+}
+
 func TestSendCustomLengthAndData(t *testing.T) {
 	var content string
 	name := registerFake(t, func(_ context.Context, _ channel.Target, msg channel.Message) error {
