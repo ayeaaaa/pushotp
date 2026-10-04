@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS tickets (
 CREATE INDEX IF NOT EXISTS idx_tickets_receiver_created ON tickets(receiver, created_at);
 `
 
+const legacyNanoThreshold = 1_000_000_000_000_000
+
 type Store struct {
 	db   *sql.DB
 	stop chan struct{}
@@ -44,6 +46,11 @@ func New(path string) (*Store, error) {
 	if _, err := db.Exec(schema); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("sqlite: schema: %w", err)
+	}
+	if _, err := db.Exec(`UPDATE tickets SET created_at = created_at / 1000000, expires_at = expires_at / 1000000
+		WHERE ABS(created_at) >= ? OR ABS(expires_at) >= ?`, legacyNanoThreshold, legacyNanoThreshold); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("sqlite: migrate legacy timestamps: %w", err)
 	}
 	s := &Store{db: db, stop: make(chan struct{}), done: make(chan struct{})}
 	go s.janitor()

@@ -135,6 +135,40 @@ func Run(t *testing.T, newStore func(t *testing.T) store.Store) {
 		}
 	})
 
+	t.Run("IncrAttemptIfBelowConcurrent", func(t *testing.T) {
+		s := newStore(t)
+		now := time.Now()
+		if err := s.SaveTicket(ctx, store.Ticket{ID: "attempts", Receiver: "admin", CodeHash: []byte{1}, Salt: []byte{1}, CreatedAt: now, ExpiresAt: now.Add(time.Minute)}); err != nil {
+			t.Fatal(err)
+		}
+		const n = 32
+		const max = 5
+		var wg sync.WaitGroup
+		var allowedCount int32
+		for i := 0; i < n; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if _, allowed, err := s.IncrAttemptIfBelow(ctx, "attempts", max); err != nil {
+					t.Errorf("IncrAttemptIfBelow: %v", err)
+				} else if allowed {
+					atomic.AddInt32(&allowedCount, 1)
+				}
+			}()
+		}
+		wg.Wait()
+		if allowedCount != max {
+			t.Fatalf("allowed = %d, want %d", allowedCount, max)
+		}
+		got, err := s.GetTicket(ctx, "attempts")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Attempts != max {
+			t.Fatalf("attempts = %d, want %d", got.Attempts, max)
+		}
+	})
+
 	t.Run("FarFutureTimestamps", func(t *testing.T) {
 		s := newStore(t)
 		future := time.Date(2319, 1, 14, 0, 0, 0, 0, time.UTC)
