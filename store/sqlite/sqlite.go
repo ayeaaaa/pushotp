@@ -71,18 +71,11 @@ func boolToInt(b bool) int {
 	return 0
 }
 
-func blob(b []byte) []byte {
-	if b == nil {
-		return []byte{}
-	}
-	return b
-}
-
 func (s *Store) SaveTicket(ctx context.Context, t store.Ticket) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO tickets (id, receiver, scene, code_hash, salt, expires_at, created_at, attempts, used)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.Receiver, t.Scene, blob(t.CodeHash), blob(t.Salt),
+		t.ID, t.Receiver, t.Scene, t.CodeHash, t.Salt,
 		t.ExpiresAt.UnixNano(), t.CreatedAt.UnixNano(), t.Attempts, boolToInt(t.Used))
 	if err != nil {
 		return fmt.Errorf("sqlite: save ticket: %w", err)

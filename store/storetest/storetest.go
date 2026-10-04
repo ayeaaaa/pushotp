@@ -48,7 +48,7 @@ func Run(t *testing.T, newStore func(t *testing.T) store.Store) {
 	t.Run("IncrAttempt", func(t *testing.T) {
 		s := newStore(t)
 		now := time.Now()
-		if err := s.SaveTicket(ctx, store.Ticket{ID: "t2", Receiver: "admin", CreatedAt: now, ExpiresAt: now.Add(time.Minute)}); err != nil {
+		if err := s.SaveTicket(ctx, store.Ticket{ID: "t2", Receiver: "admin", CodeHash: []byte{1}, Salt: []byte{1}, CreatedAt: now, ExpiresAt: now.Add(time.Minute)}); err != nil {
 			t.Fatal(err)
 		}
 		for want := 1; want <= 3; want++ {
@@ -65,7 +65,7 @@ func Run(t *testing.T, newStore func(t *testing.T) store.Store) {
 	t.Run("MarkUsed", func(t *testing.T) {
 		s := newStore(t)
 		now := time.Now()
-		if err := s.SaveTicket(ctx, store.Ticket{ID: "t3", Receiver: "admin", CreatedAt: now, ExpiresAt: now.Add(time.Minute)}); err != nil {
+		if err := s.SaveTicket(ctx, store.Ticket{ID: "t3", Receiver: "admin", CodeHash: []byte{1}, Salt: []byte{1}, CreatedAt: now, ExpiresAt: now.Add(time.Minute)}); err != nil {
 			t.Fatal(err)
 		}
 		if err := s.MarkUsed(ctx, "t3"); err != nil {
@@ -83,9 +83,9 @@ func Run(t *testing.T, newStore func(t *testing.T) store.Store) {
 	t.Run("CountRecentAndLastSent", func(t *testing.T) {
 		s := newStore(t)
 		now := time.Now()
-		_ = s.SaveTicket(ctx, store.Ticket{ID: "old", Receiver: "admin", CreatedAt: now.Add(-90 * time.Minute), ExpiresAt: now.Add(-80 * time.Minute)})
-		_ = s.SaveTicket(ctx, store.Ticket{ID: "new", Receiver: "admin", CreatedAt: now.Add(-30 * time.Minute), ExpiresAt: now.Add(30 * time.Minute)})
-		_ = s.SaveTicket(ctx, store.Ticket{ID: "other", Receiver: "guest", CreatedAt: now, ExpiresAt: now.Add(time.Minute)})
+		_ = s.SaveTicket(ctx, store.Ticket{ID: "old", Receiver: "admin", CodeHash: []byte{1}, Salt: []byte{1}, CreatedAt: now.Add(-90 * time.Minute), ExpiresAt: now.Add(-80 * time.Minute)})
+		_ = s.SaveTicket(ctx, store.Ticket{ID: "new", Receiver: "admin", CodeHash: []byte{1}, Salt: []byte{1}, CreatedAt: now.Add(-30 * time.Minute), ExpiresAt: now.Add(30 * time.Minute)})
+		_ = s.SaveTicket(ctx, store.Ticket{ID: "other", Receiver: "guest", CodeHash: []byte{1}, Salt: []byte{1}, CreatedAt: now, ExpiresAt: now.Add(time.Minute)})
 		count, err := s.CountRecent(ctx, "admin", time.Hour)
 		if err != nil || count != 1 {
 			t.Fatalf("CountRecent = %d, %v; want 1", count, err)
@@ -105,8 +105,8 @@ func Run(t *testing.T, newStore func(t *testing.T) store.Store) {
 	t.Run("Cleanup", func(t *testing.T) {
 		s := newStore(t)
 		now := time.Now()
-		_ = s.SaveTicket(ctx, store.Ticket{ID: "stale", Receiver: "admin", CreatedAt: now.Add(-2 * time.Hour), ExpiresAt: now.Add(-time.Hour)})
-		_ = s.SaveTicket(ctx, store.Ticket{ID: "fresh", Receiver: "admin", CreatedAt: now, ExpiresAt: now.Add(time.Minute)})
+		_ = s.SaveTicket(ctx, store.Ticket{ID: "stale", Receiver: "admin", CodeHash: []byte{1}, Salt: []byte{1}, CreatedAt: now.Add(-2 * time.Hour), ExpiresAt: now.Add(-time.Hour)})
+		_ = s.SaveTicket(ctx, store.Ticket{ID: "fresh", Receiver: "admin", CodeHash: []byte{1}, Salt: []byte{1}, CreatedAt: now, ExpiresAt: now.Add(time.Minute)})
 		if err := s.Cleanup(ctx, now); err != nil {
 			t.Fatal(err)
 		}
