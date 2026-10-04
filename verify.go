@@ -144,7 +144,7 @@ func (v *Verifier) Send(ctx context.Context, req SendRequest) (*Ticket, error) {
 	if req.TTL > 0 {
 		ttl = req.TTL
 	}
-	t := Ticket{
+	t := store.Ticket{
 		ID:        id,
 		Receiver:  req.Receiver,
 		Scene:     req.Scene,
@@ -166,10 +166,12 @@ func (v *Verifier) Send(ctx context.Context, req SendRequest) (*Ticket, error) {
 	msg := channel.Message{Title: "验证码", Content: content}
 	target := channel.Target{Receiver: req.Receiver, Config: v.channelConfig(rc)}
 	if err := v.channels[req.Receiver].Send(ctx, target, msg); err != nil {
-		_ = v.store.DeleteTicket(context.WithoutCancel(ctx), id)
+		if delErr := v.store.DeleteTicket(context.WithoutCancel(ctx), id); delErr != nil {
+			v.logger.Warn("delete failed-send ticket", "err", delErr)
+		}
 		return nil, fmt.Errorf("%w: %w", ErrChannelSend, err)
 	}
-	return &t, nil
+	return &Ticket{ID: t.ID, Receiver: t.Receiver, Scene: t.Scene, ExpiresAt: t.ExpiresAt}, nil
 }
 
 func (v *Verifier) Verify(ctx context.Context, req VerifyRequest) (*VerifyResult, error) {

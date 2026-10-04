@@ -4,10 +4,14 @@ import (
 	"time"
 
 	"pushotp/issuer"
-	"pushotp/store"
 )
 
-type Ticket = store.Ticket
+type Ticket struct {
+	ID        string
+	Receiver  string
+	Scene     string
+	ExpiresAt time.Time
+}
 
 type Claims = issuer.Claims
 

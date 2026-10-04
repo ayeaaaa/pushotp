@@ -84,7 +84,7 @@ go run . -config config.yaml
 | `code.max_per_hour` | 每接收人每小时发送上限 | `10` |
 | `issuer.enabled` | 是否在校验成功后签发 HMAC 令牌 | `false` |
 | `issuer.secret` | 令牌签名密钥（启用时必填） | - |
-| `issuer.ttl` | 令牌有效期 | `24h` |
+| `issuer.ttl` | 令牌有效期，Go duration 字符串（如 24h） | `24h` |
 | `receivers[].name` | 接收人名称，调用时按名指定 | 必填 |
 | `receivers[].channel` | 渠道：`pushplus` 或 `telegram` | 必填 |
 | `receivers[].pushplus.token` | pushplus token | pushplus 必填 |

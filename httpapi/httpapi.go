@@ -100,6 +100,10 @@ func (h *Handler) handleSend(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
+	if body.Length != 0 && (body.Length < 4 || body.Length > 8) {
+		writeError(w, http.StatusBadRequest, "invalid_request")
+		return
+	}
 	var ttl time.Duration
 	if body.TTL != "" {
 		parsed, err := time.ParseDuration(body.TTL)

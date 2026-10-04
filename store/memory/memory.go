@@ -49,6 +49,12 @@ func cloneTicket(t store.Ticket) store.Ticket {
 func (s *Store) SaveTicket(ctx context.Context, t store.Ticket) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if t.CodeHash == nil {
+		t.CodeHash = []byte{}
+	}
+	if t.Salt == nil {
+		t.Salt = []byte{}
+	}
 	s.tickets[t.ID] = cloneTicket(t)
 	return nil
 }

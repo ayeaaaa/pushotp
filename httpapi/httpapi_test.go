@@ -210,3 +210,12 @@ func TestInvalidJSON(t *testing.T) {
 		t.Fatalf("status = %d body = %s", rec.Code, rec.Body)
 	}
 }
+
+func TestInvalidLength(t *testing.T) {
+	name := registerFake(t, nil)
+	h := newHandler(t, baseConfig(name), "")
+	rec := doJSON(t, h, http.MethodPost, "/api/v1/send", map[string]any{"receiver": "admin", "length": 3}, nil)
+	if rec.Code != http.StatusBadRequest || decodeErrorCode(t, rec) != "invalid_request" {
+		t.Fatalf("status = %d body = %s", rec.Code, rec.Body)
+	}
+}

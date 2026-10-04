@@ -72,10 +72,18 @@ func boolToInt(b bool) int {
 }
 
 func (s *Store) SaveTicket(ctx context.Context, t store.Ticket) error {
+	codeHash := t.CodeHash
+	if codeHash == nil {
+		codeHash = []byte{}
+	}
+	salt := t.Salt
+	if salt == nil {
+		salt = []byte{}
+	}
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO tickets (id, receiver, scene, code_hash, salt, expires_at, created_at, attempts, used)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.Receiver, t.Scene, t.CodeHash, t.Salt,
+		t.ID, t.Receiver, t.Scene, codeHash, salt,
 		t.ExpiresAt.UnixNano(), t.CreatedAt.UnixNano(), t.Attempts, boolToInt(t.Used))
 	if err != nil {
 		return fmt.Errorf("sqlite: save ticket: %w", err)

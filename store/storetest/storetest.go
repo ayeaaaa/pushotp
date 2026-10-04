@@ -19,6 +19,21 @@ func Run(t *testing.T, newStore func(t *testing.T) store.Store) {
 		}
 	})
 
+	t.Run("NilHashAndSalt", func(t *testing.T) {
+		s := newStore(t)
+		now := time.Now()
+		if err := s.SaveTicket(ctx, store.Ticket{ID: "nilhash", Receiver: "admin", CreatedAt: now, ExpiresAt: now.Add(time.Minute)}); err != nil {
+			t.Fatalf("SaveTicket with nil hash/salt: %v", err)
+		}
+		got, err := s.GetTicket(ctx, "nilhash")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got.CodeHash) != 0 || len(got.Salt) != 0 {
+			t.Fatalf("hash/salt = %d/%d bytes, want empty", len(got.CodeHash), len(got.Salt))
+		}
+	})
+
 	t.Run("SaveGetDelete", func(t *testing.T) {
 		s := newStore(t)
 		now := time.Now()
