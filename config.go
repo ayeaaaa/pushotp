@@ -104,6 +104,9 @@ func (c Config) Validate() error {
 	if c.Issuer.Enabled && c.Issuer.Secret == "" {
 		return fmt.Errorf("%w: issuer enabled but secret is empty", ErrConfig)
 	}
+	if c.Issuer.Enabled && c.Issuer.TTL <= 0 {
+		return fmt.Errorf("%w: issuer ttl must be positive", ErrConfig)
+	}
 	if c.Storage.Type != "memory" && c.Storage.Type != "sqlite" {
 		return fmt.Errorf("%w: unknown storage type %q", ErrConfig, c.Storage.Type)
 	}

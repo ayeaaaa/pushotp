@@ -56,6 +56,11 @@ func TestValidateErrors(t *testing.T) {
 		{"missing pushplus token", func(c *Config) { c.Receivers[0].Pushplus.Token = "" }},
 		{"missing telegram creds", func(c *Config) { c.Receivers[0] = ReceiverConfig{Name: "me", Channel: "telegram"} }},
 		{"issuer without secret", func(c *Config) { c.Issuer.Enabled = true }},
+		{"issuer non-positive ttl", func(c *Config) {
+			c.Issuer.Enabled = true
+			c.Issuer.Secret = "s"
+			c.Issuer.TTL = -time.Minute
+		}},
 		{"bad length", func(c *Config) { c.Code.Length = 3 }},
 		{"bad storage", func(c *Config) { c.Storage.Type = "redis" }},
 		{"sqlite without path", func(c *Config) { c.Storage.Type = "sqlite" }},
