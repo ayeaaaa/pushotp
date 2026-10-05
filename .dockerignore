@@ -1,0 +1,5 @@
+.git/
+.superpowers/
+config.yaml
+*.db
+*.log
